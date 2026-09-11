@@ -37,9 +37,10 @@ import config
 logger = logging.getLogger("habesha_bet")
 
 _backup_lock = Lock()
+_init_db_lock = Lock()
+_init_db_table_lock = Lock()
 _last_backup_ts = None
 _db_pool = None
-_init_db_lock = Lock()
 
 
 def get_connection():
@@ -84,20 +85,22 @@ def release_connection(conn):
 
 def init_db():
     """Create all tables and indexes if they don't exist. Safe to call every startup."""
-    conn = get_connection()
-    cur = conn.cursor(cursor_factory=extras.RealDictCursor)
-    try:
-        _init_tables(cur)
-        conn.commit()
-    except Exception:
+    with _init_db_table_lock:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=extras.RealDictCursor)
         try:
-            conn.rollback()
+            _init_tables(cur)
+            conn.commit()
         except Exception:
-            pass
-        raise
-    finally:
-        release_connection(conn)
-    init_house_wallet()
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise
+        finally:
+            release_connection(conn)
+        init_house_wallet()
+
 
 
 def backup_database():
