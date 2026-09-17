@@ -101,11 +101,9 @@ export default function LiveGameScreen({ gameId, onFinished }) {
     setState(prev => {
       if (!prev) return prev;
       const nextCards = prev.my_cards.map(card => {
-        if (card.card_index !== cardIndex) return card;
         const isMarked = (card.marked || []).includes(number);
-        const newMarked = isMarked
-          ? card.marked
-          : [...(card.marked || []), number];
+        if (isMarked) return card;
+        const newMarked = [...(card.marked || []), number];
         return { ...card, marked: newMarked };
       });
       return { ...prev, my_cards: nextCards };
