@@ -520,7 +520,11 @@ def handle_toggle_auto_win(user_id: int, game_id: int, enabled: bool) -> dict:
 
 def handle_mark_number(user_id: int, game_id: int, card_index: int, number: int) -> dict:
     """Mark a called number on a card. Only allows marking numbers that
-    have actually been called in this game."""
+    have actually been called in this game.
+
+    Marks the number on ALL cards owned by this player in the current game,
+    so the user only needs to tap each called number once regardless of how
+    many cards they hold."""
     game = db.get_game(game_id)
     if game is None or game["state"] != "running":
         return {"ok": False, "error": "game_not_running", "message": "Game is not running."}
@@ -533,12 +537,16 @@ def handle_mark_number(user_id: int, game_id: int, card_index: int, number: int)
     if card_index not in my_cards:
         return {"ok": False, "error": "not_your_card", "message": "You don't own this card."}
 
-    marked = set(db.get_marked_numbers(game_id, card_index))
-    if number not in marked:
-        marked.add(number)
-        db.update_marked_numbers(game_id, card_index, sorted(marked))
+    # Mark the number on ALL the player's cards in this game
+    for ci in my_cards:
+        marked = set(db.get_marked_numbers(game_id, ci))
+        if number not in marked:
+            marked.add(number)
+            db.update_marked_numbers(game_id, ci, sorted(marked))
 
+    # Return marks for the requested card (frontend polls reconcile the rest)
     return {"ok": True, "marked": sorted(marked)}
+
 
 
 def handle_claim_bingo(user_id: int, game_id: int) -> dict:
