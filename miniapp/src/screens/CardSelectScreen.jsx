@@ -52,6 +52,25 @@ export default function CardSelectScreen({ roomFee, onBack, onGameStart }) {
 
   const effectiveData = pollData || data;
 
+  const toggle = (idx) => {
+    if (!effectiveData) return;
+    if (effectiveData.taken_cards.includes(idx) || effectiveData.my_cards.includes(idx)) return;
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) {
+        next.delete(idx);
+      } else {
+        if (next.size + effectiveData.my_cards.length >= effectiveData.max_cards_per_player) {
+          showAlert(`You can hold at most ${effectiveData.max_cards_per_player} cards per round.`);
+          return prev;
+        }
+        next.add(idx);
+      }
+      return next;
+    });
+    haptic.light();
+  };
+
   const showPreview = async (idx) => {
     setPreviewLoading(true);
     try {
@@ -82,18 +101,13 @@ export default function CardSelectScreen({ roomFee, onBack, onGameStart }) {
     haptic.medium();
   };
 
-  const confirmPurchase = useCallback(async (indices) => {
-    const toBuy = indices ?? [...selected];
-    if (toBuy.length === 0) return;
+  const confirmPurchase = useCallback(async () => {
+    if (selected.size === 0) return;
     setBuying(true);
     try {
-      await runAction(() => api.buyCards(roomFee, toBuy));
+      await runAction(() => api.buyCards(roomFee, [...selected]));
       haptic.success();
-      setSelected(prev => {
-        const next = new Set(prev);
-        toBuy.forEach(i => next.delete(i));
-        return next;
-      });
+      setSelected(new Set());
       await refreshUser();
       const fresh = await load();
       if (fresh.state === 'running') onGameStart(fresh.game_id);
@@ -253,18 +267,10 @@ export default function CardSelectScreen({ roomFee, onBack, onGameStart }) {
                 <div className="text-dim text-sm text-center">Preview unavailable</div>
               )}
               <div className="btn-row mt-2">
-                <button className="btn btn-secondary" onClick={() => setPreviewCard(null)}>Cancel</button>
+                <button className="btn btn-secondary" onClick={() => setPreviewCard(null)}>Close</button>
                 {!effectiveData.taken_cards.includes(previewCard.card_index) && !effectiveData.my_cards.includes(previewCard.card_index) && (
-                  <button
-                    className="btn btn-primary"
-                    disabled={buying}
-                    onClick={() => {
-                      const idx = previewCard.card_index;
-                      setPreviewCard(null);
-                      confirmPurchase([idx]);
-                    }}
-                  >
-                    {buying ? 'Buying…' : `Buy — ${fmt(roomFee)} ETB`}
+                  <button className="btn btn-primary" onClick={() => { toggle(previewCard.card_index); setPreviewCard(null); }}>
+                    {selected.has(previewCard.card_index) ? 'Deselect' : 'Select'}
                   </button>
                 )}
               </div>
